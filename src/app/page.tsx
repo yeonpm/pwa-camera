@@ -31,11 +31,21 @@ export default function Home() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
+  const isIOS = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent ?? "";
+    const isAppleMobile = /iPad|iPhone|iPod/.test(ua);
+    const isIPadOS13Plus =
+      navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return isAppleMobile || isIPadOS13Plus;
+  }, []);
+
   const canInstall = useMemo(
     () => !isInstalled && deferredPrompt !== null,
     [deferredPrompt, isInstalled]
   );
 
+  const [iosInstallOpen, setIosInstallOpen] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [thumbs, setThumbs] = useState<string[]>([]);
@@ -143,6 +153,10 @@ export default function Home() {
   };
 
   const installPwa = async () => {
+    if (isIOS) {
+      setIosInstallOpen(true);
+      return;
+    }
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
     await deferredPrompt.userChoice;
@@ -180,15 +194,13 @@ export default function Home() {
           </Stack>
 
           <Stack direction="row" spacing={1.25}>
-            {canInstall ? (
-              <Button startIcon={<DownloadRoundedIcon />} onClick={installPwa}>
-                다운로드 (PWA)
-              </Button>
-            ) : (
-              <Button startIcon={<DownloadRoundedIcon />} disabled>
-                다운로드 (PWA)
-              </Button>
-            )}
+            <Button
+              startIcon={<DownloadRoundedIcon />}
+              onClick={installPwa}
+              disabled={isInstalled || (!canInstall && !isIOS)}
+            >
+              다운로드 (PWA)
+            </Button>
             <Button
               startIcon={<PhotoCameraRoundedIcon />}
               color="primary"
@@ -204,6 +216,12 @@ export default function Home() {
               <Alert severity="info" variant="outlined">
                 - **다운로드(PWA)** 버튼은 설치 가능한 경우에만 활성화됩니다.
                 <br />- 설치 후(standalone)에서만 **사진 촬영**이 활성화됩니다.
+                {isIOS && (
+                  <>
+                    <br />- iOS Safari는 설치 프롬프트가 없어서 “공유” → “홈 화면에
+                    추가”로 설치합니다.
+                  </>
+                )}
               </Alert>
             )}
 
@@ -289,6 +307,36 @@ export default function Home() {
           ) : (
             <Button onClick={captureFrame}>촬영</Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={iosInstallOpen}
+        onClose={() => setIosInstallOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>iOS에서 설치하기</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1}>
+            <Typography variant="body2" color="text.secondary">
+              iOS Safari는 자동 설치 팝업이 없어서 아래 순서로 설치합니다.
+            </Typography>
+            <Stack spacing={0.75}>
+              <Typography variant="body2">
+                1) Safari 하단(또는 상단)의 <b>공유</b> 버튼 탭
+              </Typography>
+              <Typography variant="body2">
+                2) <b>홈 화면에 추가</b> 선택
+              </Typography>
+              <Typography variant="body2">
+                3) 추가 후 홈 화면의 앱 아이콘으로 실행(standalone)
+              </Typography>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIosInstallOpen(false)}>확인</Button>
         </DialogActions>
       </Dialog>
     </Box>
